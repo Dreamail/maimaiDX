@@ -304,7 +304,7 @@ mai = MaiMusic()
 
 class Guess:
 
-    Session: Dict[Tuple[int, int], Dict[str, Union[MaiMusic, int]]] = {}
+    Group: Dict[int, Dict[str, Union[MaiMusic, int]]] = {}
 
     def __init__(self) -> None:
         """
@@ -317,26 +317,26 @@ class Guess:
                 json.dump({'enable': [], 'disable': []}, f)
         self.config: Dict[str, List[int]] = json.load(open(self.config_json, 'r', encoding='utf-8'))
     
-    def add(self, gid: Tuple[int, int], music: MaiMusic, cycle: int = 0):
+    def add(self, gid: int, music: MaiMusic, cycle: int = 0):
         """
         新增猜歌群
         """
-        self.Session[gid] = {
+        self.Group[gid] = {
             'object':  music,
             'cycle': cycle
         }
 
-    def end(self, gid: Tuple[int, int]):
+    def end(self, gid: int):
         """
         结束猜歌
         """
-        del self.Session[gid]
+        del self.Group[gid]
 
-    def guess_change(self, gid: int, set: bool):
+    def guess_change(self, gid: int, set_: bool):
         """
         猜歌开关
         """
-        if set:
+        if set_:
             if gid not in self.config['enable']:
                 self.config['enable'].append(gid)
             if gid in self.config['disable']:
