@@ -158,7 +158,7 @@ async def _():
 
 @repo.handle()
 async def _():
-    await manual.finish(f'项目地址：https://github.com/Yuri-YuzuChaN/maimaiDX\n求star，求宣传~', reply_message=True)
+    await manual.finish('项目地址：https://github.com/Yuri-YuzuChaN/maimaiDX\n求star，求宣传~', reply_message=True)
 
 
 @search_base.handle()
