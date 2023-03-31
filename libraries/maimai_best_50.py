@@ -1,4 +1,3 @@
-import io
 import math
 import os
 from typing import Dict, List, Optional, Tuple, Union
@@ -6,10 +5,10 @@ from typing import Dict, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw, ImageFont
 from nonebot.adapters.onebot.v11 import MessageSegment
 
-from .. import BOTNAME, static
 from .image import get_user_logo, image_to_bytesio
 from .maimaidx_api_data import get_player_data
 from .maimaidx_music import get_cover_len4_id
+from .. import BOTNAME, static
 
 scoreRank = ['d', 'c', 'b', 'bb', 'bbb', 'a', 'aa', 'aaa', 's', 's+', 'ss', 'ss+', 'sss', 'sss+']
 comboRank = ['fc', 'fc+', 'ap', 'ap+']

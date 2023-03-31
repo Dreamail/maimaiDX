@@ -18,9 +18,7 @@ from .libraries.maimai_best_50 import diffs, generate, levelList, scoreRank, com
 from .libraries.maimaidx_api_data import get_alias, post_alias
 from .libraries.maimaidx_music import Music, get_cover_len4_id, mai, guess, alias, MaiMusic
 from .libraries.maimaidx_project import (
-    SONGS_PER_PAGE,
-    draw_music_info_to_message_segment,
-    plate_to_version,
+    SONGS_PER_PAGE, draw_music_info_to_message_segment, plate_to_version,
     music_play_data, query_chart_data, rise_score_data,
     player_plate_data, level_process_data, level_achievement_list_data, rating_ranking_data,
 )

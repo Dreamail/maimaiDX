@@ -1,12 +1,23 @@
+import os
 import time
+from io import BytesIO
 from textwrap import dedent
+from typing import Union, Optional, Tuple
 
+import httpx
+from PIL import Image, ImageDraw
 from nonebot import logger
+from nonebot.adapters.onebot.v11 import MessageSegment
 
-from .image import *
-from .maimai_best_50 import *
-from .maimaidx_api_data import *
+from .image import image_to_base64, text_to_image
+from .maimai_best_50 import (
+    generateAchievementList, achievementList,
+    DrawText, computeRa, diffs,
+    scoreRank, comboRank, syncRank, combo_rank, sync_rank
+)
+from .maimaidx_api_data import get_player_data, get_rating_ranking_data
 from .maimaidx_music import MusicList, get_cover_len4_id, mai
+from .. import static, BOTNAME
 
 SONGS_PER_PAGE = 25
 level_labels = ['绿', '黄', '红', '紫', '白']
@@ -53,7 +64,7 @@ category = {
     'オンゲキCHUNITHM': 'ongeki'
 }
 
-async def download_music_pictrue(id: Union[int, str]) -> io.BytesIO:
+async def download_music_pictrue(id: Union[int, str]) -> BytesIO:
     try:
         len4id = get_cover_len4_id(id)
         if os.path.exists(file := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
@@ -61,7 +72,7 @@ async def download_music_pictrue(id: Union[int, str]) -> io.BytesIO:
         async with httpx.AsyncClient() as client:
             r = await client.get(f'https://www.diving-fish.com/covers/{len4id}.png')
             if r.status_code == 200:
-                return io.BytesIO(r.content)
+                return BytesIO(r.content)
             else:
                 return os.path.join(static, 'mai', 'cover', '0000.png')
     except:
