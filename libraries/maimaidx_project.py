@@ -64,11 +64,11 @@ category = {
     'オンゲキCHUNITHM': 'ongeki'
 }
 
-async def download_music_pictrue(id: Union[int, str]) -> BytesIO:
+async def download_music_pictrue(id_: Union[int, str]) -> BytesIO:
     try:
-        len4id = get_cover_len4_id(id)
-        if os.path.exists(file := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
-            return file
+        len4id = get_cover_len4_id(id_)
+        if os.path.exists(path := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
+            return path
         async with httpx.AsyncClient() as client:
             r = await client.get(f'https://www.diving-fish.com/covers/{len4id}.png')
             if r.status_code == 200:
@@ -257,8 +257,8 @@ async def query_chart_data(match: Tuple) -> str:
                     谱师: {chart['charter']}
                     难易度参考: {stats['tag'] if 'tag' in stats else '无'}''')
             len4id = get_cover_len4_id(music['id'])
-            if os.path.exists(file := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
-                img = file
+            if os.path.exists(path := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
+                img = path
             else:
                 img = os.path.join(static, 'mai', 'cover', '0000.png')
 

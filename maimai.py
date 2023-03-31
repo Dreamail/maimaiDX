@@ -107,8 +107,8 @@ help_text = dedent('''\
 
 def random_music(music: Music) -> str:
     len4id = get_cover_len4_id(music.id)
-    if os.path.exists(file := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
-        img = file
+    if os.path.exists(path := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
+        img = path
     else:
         img = os.path.join(static, 'mai', 'cover', '0000.png')
     msg = dedent(f'''\
@@ -120,7 +120,7 @@ def random_music(music: Music) -> str:
 
 def song_level(ds1: float, ds2: float, stats1: str = None, stats2: str = None) -> list:
     result = []
-    music_data = mai.total_list.filter(ds=(ds1, ds2))
+    music_data = mai.total_list.filter_(ds=(ds1, ds2))
     if stats1:
         if stats2:
             stats1 = stats1 + ' ' + stats2
@@ -197,11 +197,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     args = args.extract_plain_text().strip().split()
     page = 1
     if len(args) == 1:
-        music_data = mai.total_list.filter(bpm=int(args[0]))
+        music_data = mai.total_list.filter_(bpm=int(args[0]))
     elif len(args) == 2:
-        music_data = mai.total_list.filter(bpm=(int(args[0]), int(args[1])))
+        music_data = mai.total_list.filter_(bpm=(int(args[0]), int(args[1])))
     elif len(args) == 3:
-        music_data = mai.total_list.filter(bpm=(int(args[0]), int(args[1])))
+        music_data = mai.total_list.filter_(bpm=(int(args[0]), int(args[1])))
         page = int(args[2])
     else:
         music_data = None
@@ -236,7 +236,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await search_artist.finish('命令格式为：\n曲师查歌 <曲师名称> (<页数>)', reply_message=True)
     if not name:
         return
-    music_data = mai.total_list.filter(artist_search=name)
+    music_data = mai.total_list.filter_(artist_search=name)
     if not music_data:
         await search_artist.finish('没有找到这样的乐曲。', reply_message=True)
     msg = ''
@@ -267,7 +267,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await search_charter.finish('命令格式为：\n谱师查歌 <谱师名称> (<页数>)', reply_message=True)
     if not name:
         return
-    music_data = mai.total_list.filter(charter_search=name)
+    music_data = mai.total_list.filter_(charter_search=name)
     if not music_data:
         await search_charter.finish('没有找到这样的乐曲。', reply_message=True)
     msg = ''
@@ -294,9 +294,9 @@ async def _(match: Tuple = RegexGroup()):
             tp = ['SD', 'DX']
         level = match[1]
         if match[2] == '':
-            music_data = mai.total_list.filter(level=level, type=tp)
+            music_data = mai.total_list.filter_(level=level, type_=tp)
         else:
-            music_data = mai.total_list.filter(level=level, diff=['绿黄红紫白'.index(match[1])], type=tp)
+            music_data = mai.total_list.filter_(level=level, diff=['绿黄红紫白'.index(match[1])], type_=tp)
         if len(music_data) == 0:
             msg = '没有这样的乐曲哦。'
         else:
@@ -311,7 +311,7 @@ async def _(args: Message = CommandArg()):
     name = args.extract_plain_text().strip()
     if not name:
         return
-    result = mai.total_list.filter(title_search=name)
+    result = mai.total_list.filter_(title_search=name)
     if len(result) == 0:
         await search.finish('没有找到这样的乐曲。', reply_message=True)
     elif len(result) == 1:
@@ -552,12 +552,12 @@ async def _(arg: Message = CommandArg()):
             total_score = 500 * tap + slide * 1500 + hold * 1000 + touch * 500 + brk * 2500
             break_bonus = 0.01 / brk
             break_50_reduce = total_score * break_bonus / 4
-            reduce = 101 - line
-            if reduce <= 0 or reduce >= 101:
+            distance = 101 - line
+            if distance <= 0 or distance >= 101:
                 raise ValueError
             msg = dedent(f'''\
                 {music['title']} {level_labels2[level_index]}
-                分数线 {line}% 允许的最多 TAP GREAT 数量为 {(total_score * reduce / 10000):.2f}(每个-{10000 / total_score:.4f}%),
+                分数线 {line}% 允许的最多 TAP GREAT 数量为 {(total_score * distance / 10000):.2f}(每个-{10000 / total_score:.4f}%),
                 BREAK 50落(一共{brk}个)等价于 {(break_50_reduce / 100):.3f} 个 TAP GREAT(-{break_50_reduce / total_score * 100:.4f}%)''')
             await score.finish(MessageSegment.image(to_bytes_io(msg)), reply_message=True)
         except (AttributeError, ValueError) as e:
@@ -595,9 +595,9 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
     }
 
     if mai.total_list.by_id(args):
-        id = args
+        id_ = args
     elif by_t := mai.total_list.by_title(args):
-        id = by_t.id
+        id_ = by_t.id
     else:
         alias = await get_alias('songs', {'alias_name': args})
         if 'error' in alias:
@@ -608,9 +608,9 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
                 msg += f'{songs["ID"]}：{songs["Name"]}\n'
             await minfo.finish(msg.strip(), reply_message=True)
         else:
-            id = str(alias[0]["ID"])
+            id_ = str(alias[0]["ID"])
 
-    data = await music_play_data(payload, id)
+    data = await music_play_data(payload, id_)
     if not data:
         data = '您未游玩该曲目'
     await minfo.finish(data, reply_message=True)

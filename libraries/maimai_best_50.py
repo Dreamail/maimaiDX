@@ -66,8 +66,8 @@ class DrawText:
 
 class ChartInfo(object):
 
-    def __init__(self, id: str, title: str, level: int, achievement: float, rate: int, ra: int, fc: int, fs: int, ds: float):
-        self.id = id
+    def __init__(self, id_: str, title: str, level: int, achievement: float, rate: int, ra: int, fc: int, fs: int, ds: float):
+        self.id = id_
         self.title = title
         self.level = level
         self.achievement = achievement
@@ -92,7 +92,7 @@ class ChartInfo(object):
         fs = ['', 'fs', 'fsp', 'fsd', 'fsdp']
         si = fs.index(data['fs'])
         return cls(
-            id = data['song_id'],
+            id_= data['song_id'],
             title = data['title'],
             level = data['level_index'],
             achievement = data['achievements'],

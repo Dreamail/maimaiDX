@@ -163,18 +163,18 @@ class MusicList(List[Music]):
     def random(self):
         return random.choice(self)
 
-    def filter(self,
-               *,
-               level: Optional[Union[str, List[str]]] = ...,
-               ds: Optional[Union[float, List[float], Tuple[float, float]]] = ...,
-               title_search: Optional[str] = ...,
-               artist_search: Optional[str] = ...,
-               charter_search: Optional[str] = ...,
-               genre: Optional[Union[str, List[str]]] = ...,
-               bpm: Optional[Union[float, List[float], Tuple[float, float]]] = ...,
-               type: Optional[Union[str, List[str]]] = ...,
-               diff: List[int] = ...,
-               ):
+    def filter_(self,
+                *,
+                level: Optional[Union[str, List[str]]] = ...,
+                ds: Optional[Union[float, List[float], Tuple[float, float]]] = ...,
+                title_search: Optional[str] = ...,
+                artist_search: Optional[str] = ...,
+                charter_search: Optional[str] = ...,
+                genre: Optional[Union[str, List[str]]] = ...,
+                bpm: Optional[Union[float, List[float], Tuple[float, float]]] = ...,
+                type_: Optional[Union[str, List[str]]] = ...,
+                diff: List[int] = ...,
+                ):
         new_list = MusicList()
         for music in self:
             diff2 = diff
@@ -190,7 +190,7 @@ class MusicList(List[Music]):
                 continue
             if not in_or_equal(music.genre, genre):
                 continue
-            if not in_or_equal(music.type, type):
+            if not in_or_equal(music.type, type_):
                 continue
             if not in_or_equal(music.bpm, bpm):
                 continue
@@ -363,11 +363,11 @@ class Alias:
                 json.dump({'enable': [], 'disable': []}, f)
         self.config: Dict[str, List[int]] = json.load(open(self.group_alias, 'r', encoding='utf-8'))
 
-    def alias_change(self, gid: int, set: bool):
+    def alias_change(self, gid: int, set_: bool):
         """
         猜歌开关
         """
-        if set:
+        if set_:
             if gid not in self.config['enable']:
                 self.config['enable'].append(gid)
             if gid in self.config['disable']:
