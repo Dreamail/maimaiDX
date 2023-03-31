@@ -115,7 +115,7 @@ class BestList(object):
         self.data.append(elem)
         self.data.sort()
         self.data.reverse()
-        while (len(self.data) > self.size):
+        while len(self.data) > self.size:
             del self.data[-1]
     
     def __getitem__(self, index):
