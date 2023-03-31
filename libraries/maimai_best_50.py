@@ -227,7 +227,7 @@ class DrawBest:
 
         return f'UI_CMN_MatchLevel_{t}.png'
 
-    def whiledraw(self, data: BestList, xi: int, yi: int) -> Image.Image:
+    def whiledraw(self, data: BestList, xi: int, yi: int) -> None:
         y = yi
         color = [(17, 177, 54, 255), (199, 69, 12, 255), (192, 32, 56, 255), (103, 20, 141, 255), (142, 44, 215, 255)]
         rankPic = 'D C B BB BBB A AA AAA S Sp SS SSp SSS SSSp'.split(' ')

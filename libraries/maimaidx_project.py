@@ -16,7 +16,7 @@ from .maimai_best_50 import (
     scoreRank, comboRank, syncRank, combo_rank, sync_rank
 )
 from .maimaidx_api_data import get_player_data, get_rating_ranking_data
-from .maimaidx_music import MusicList, get_cover_len4_id, mai
+from .maimaidx_music import MusicList, get_cover_len4_id, mai, Music
 from .. import static, BOTNAME
 
 SONGS_PER_PAGE = 25
@@ -64,7 +64,7 @@ category = {
     'オンゲキCHUNITHM': 'ongeki'
 }
 
-async def download_music_pictrue(id_: Union[int, str]) -> BytesIO:
+async def download_music_pictrue(id_: Union[int, str]) -> Union[BytesIO, str]:
     try:
         len4id = get_cover_len4_id(id_)
         if os.path.exists(path := os.path.join(static, 'mai', 'cover', f'{len4id}.png')):
@@ -79,11 +79,11 @@ async def download_music_pictrue(id_: Union[int, str]) -> BytesIO:
         return os.path.join(static, 'mai', 'cover', '0000.png')
 
 
-async def draw_music_info_to_message_segment(music: MusicList) -> MessageSegment:
+async def draw_music_info_to_message_segment(music: Music) -> MessageSegment:
     return MessageSegment.image(await draw_music_info(music))
 
 
-async def draw_music_info(music: MusicList) -> BytesIO:
+async def draw_music_info(music: Music) -> BytesIO:
     im = Image.new('RGBA', (800, 1000))
     genre = category[music['basic_info']['genre']]
 

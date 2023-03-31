@@ -202,7 +202,7 @@ class MusicList(List[Music]):
             new_list.append(music)
         return new_list
 
-def get_cover_len4_id(mid: str) -> str:
+def get_cover_len4_id(mid: Union[str, int]) -> str:
     mid = int(mid)
 
     if 10001 <= mid:
@@ -255,7 +255,7 @@ class MaiMusic:
         封装所有曲目信息以及猜歌数据，便于更新
         """
 
-    async def get_music(self) -> MusicList:
+    async def get_music(self) -> None:
         """
         获取所有曲目数据
         """
