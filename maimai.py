@@ -30,12 +30,11 @@ def song_level(ds1: float, ds2: float, stats1: str = None, stats2: str = None) -
             stats1 = stats1.title()
         for music in sorted(music_data, key=lambda i: int(i.id)):
             for i in music.diff:
-                if music.stats[i].difficulty.lower() == stats1.lower():
-                    result.append((music.id, music.title, music.ds[i], diffs[i], music.level[i], music.stats[i].difficulty))
+                result.append((music.id, music.title, music.ds[i], diffs[i], music.level[i]))
     else:
         for music in sorted(music_data, key=lambda i: int(i.id)):
             for i in music.diff:
-                result.append((music.id, music.title, music.ds[i], diffs[i], music.level[i], music.stats[i].difficulty))
+                result.append((music.id, music.title, music.ds[i], diffs[i], music.level[i]))
     return result
 
 @on_websocket_connect
@@ -47,6 +46,7 @@ async def get_music(event: CQEvent):
     await mai.get_music()
     log.info('正在获取maimai所有曲目别名信息')
     await mai.get_music_alias()
+    log.info('获取完成')
     mai.guess()
 
 @sv.on_fullmatch(['帮助maimaiDX', '帮助maimaidx'])
@@ -82,7 +82,7 @@ async def search_dx_song_level(bot: NoneBot, ev: CQEvent):
         await bot.finish(ev, f'结果过多（{len(result)} 条），请缩小搜索范围', at_sender=True)
     msg = ''
     for i in result:
-        msg += f'{i[0]}. {i[1]} {i[3]} {i[4]}({i[2]}) {i[5]}\n'
+        msg += f'{i[0]}. {i[1]} {i[3]} {i[4]}({i[2]})\n'
     await bot.send(ev, MessageSegment.image(image_to_base64(text_to_image(msg.strip()))), at_sender=True)
 
 @sv.on_prefix(['bpm查歌', 'search bpm'])
@@ -334,7 +334,7 @@ async def alias_status(bot: NoneBot, ev: CQEvent):
         votes = status[tag]['votes']
         msg.append(f'{tag}：\n{await draw_music_info(mai.total_list.by_id(id))}\n别名：{alias_name}\n票数：{usernum}/{votes}')
     await bot.send(ev, f'浏览{public_addr}查看详情或查看以下合并消息')
-    await bot.send_group_forward_msg(group_id=ev.group_id, messages=render_forward_msg(msg, ev.self_id, f'{BOTNAME} Bot'))
+    await bot.send_group_forward_msg(group_id=ev.group_id, messages=render_forward_msg(msg, ev.self_id, BOTNAME))
 
 @sv.on_fullmatch('开启别名推送')
 async def alias_on(bot: NoneBot, ev: CQEvent):
@@ -391,8 +391,8 @@ async def alias_apply_status():
                     continue
                 try:
                     await sv.bot.send_group_msg(group_id=gid, message='\n======\n'.join(msg) + f'\n浏览{public_addr}查看详情')
-                    await asyncio.sleep(2)
-                except:
+                    await asyncio.sleep(5)
+                except: 
                     continue
     await asyncio.sleep(5)
     end = await get_alias('end')
@@ -410,7 +410,7 @@ async def alias_apply_status():
                     continue
                 try:
                     await sv.bot.send_group_msg(group_id=gid, message='\n======\n'.join(msg2))
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(5)
                 except:
                     continue
 
@@ -503,6 +503,47 @@ async def maiinfo(bot: NoneBot, ev: CQEvent):
         else:
             id = str(alias[0].ID)
     await bot.send(ev, await music_play_data(payload, id), at_sender=True)
+
+@sv.on_prefix(['ginfo', 'Ginfo', 'GINFO'])
+async def globinfo(bot: NoneBot, ev: CQEvent):
+    args: str = ev.message.extract_plain_text().strip()
+    if not args:
+        await bot.finish(ev, '请输入曲目id或曲名', at_sender=True)
+    if args[0] not in '绿黄红紫白':
+        level_index = 3
+    else:
+        level_index = '绿黄红紫白'.index(args[0])
+        args = args[1:].strip()
+        if not args:
+            await bot.finish(ev, '请输入曲目id或曲名', at_sender=True)
+    if mai.total_list.by_id(args):
+        id = args
+    elif by_t := mai.total_list.by_title(args):
+        id = by_t.id
+    else:
+        alias = mai.total_alias_list.by_alias(args)
+        if not alias:
+            await bot.finish(ev, '未找到曲目', at_sender=True)
+        elif len(alias) != 1:
+            msg = f'找到相同别名的曲目，请使用以下ID查询：\n'
+            for songs in alias:
+                msg += f'{songs.ID}：{songs.Name}\n'
+            await bot.finish(ev, msg.strip(), at_sender=True)
+        else:
+            id = str(alias[0].ID)
+    music = mai.total_list.by_id(id)
+    if not music.stats:
+        await bot.finish(ev, '该乐曲还没有统计信息', at_sender=True)
+    if level_index >= len(music.stats) or not music.stats[level_index]:
+        await bot.finish(ev, '该乐曲没有这个等级', at_sender=True)
+    stats = music.stats[level_index]
+    await bot.send(ev, await music_global_data(music, level_index) + f'''
+游玩次数：{round(stats.count)}
+拟合难度：{stats.fit_difficulty:.2f}
+平均达成率：{stats.avg:.2f}%
+平均 DX 分数：{stats.avg_dx:.1f}
+谱面成绩标准差：{stats.std_dev:.2f}
+''', at_sender=True)
 
 @sv.on_rex(r'^我要在?([0-9]+\+?)?上([0-9]+)分\s?(.+)?')  # 慎用，垃圾代码非常吃机器性能
 async def rise_score(bot: NoneBot, ev: CQEvent):
@@ -640,7 +681,7 @@ async def guess_music_loop(bot: NoneBot, ev: CQEvent):
 答案将在30秒后揭晓''')
         await give_answer(bot, ev)
     guess.Group[gid]['cycle'] += 1
-    await guess_music_loop(bot, ev, )
+    await guess_music_loop(bot, ev)
 
 async def give_answer(bot: NoneBot, ev: CQEvent):
     gid = str(ev.group_id)
@@ -721,7 +762,7 @@ async def guess_off(bot: NoneBot, ev: CQEvent):
 
     await bot.send(ev, msg, at_sender=True)
 
-@sv.scheduled_job('cron', hour='5')
+@sv.scheduled_job('cron', hour='4')
 async def Data_Update():
     await mai.get_music()
     mai.guess()
