@@ -373,11 +373,10 @@ async def _(session: CommandSession):
 
 @sv.scheduled_job('interval', minutes=5)
 async def alias_apply_status():
-    if not alias.config['global']:
-        return
     group = await sv.get_enable_groups()
-    status = await get_alias('status')
-    if status:
+    if status := await get_alias('status'):
+        if not alias.config['global']:
+            return
         msg = ['检测到新的别名申请']
         for tag in status:
             if status[tag]['isNew'] and (usernum := len(status[tag]['User'])) < (votes := status[tag]['votes']):
@@ -395,15 +394,16 @@ async def alias_apply_status():
                 except: 
                     continue
     await asyncio.sleep(5)
-    end = await get_alias('end')
-    if end:
-        await mai.get_music_alias()
+    if end := await get_alias('end'):
+        if not alias.config['global']:
+            await mai.get_music_alias()
+            return
         msg2 = ['以下是已成功添加别名的曲目']
         for ta in end:
             id = str(end[ta]['ID'])
             alias_name = end[ta]['ApplyAlias']
             music = mai.total_list.by_id(id)
-            msg2.append(f'标题：{music.title}\nID：{id}\n别名：{alias_name}')
+            msg2.append(f'ID：{id}\n标题：{music.title}\n别名：{alias_name}')
         if len(msg2) != 1:
             for gid in group.keys():
                 if gid in alias.config['disable']:
