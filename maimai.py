@@ -395,8 +395,8 @@ async def alias_apply_status():
                         continue
     await asyncio.sleep(5)
     if end := await get_music_alias('end'):
-        if 'error' in status:
-            log.error(f'发生错误：{status["error"]}')
+        if 'error' in end:
+            log.error(f'发生错误：{end["error"]}')
             raise ValueError
         if alias.config['global']:
             msg2 = ['以下是已成功添加别名的曲目']
