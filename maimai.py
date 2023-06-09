@@ -53,10 +53,6 @@ async def get_music(event: CQEvent):
 async def dx_help(bot: NoneBot, ev: CQEvent):
     await bot.send(ev, MessageSegment.image(f'file:///{os.path.join(static, "maimaidxhelp.png")}'), at_sender=True)
 
-@sv.on_fullmatch(['项目地址maimaiDX', '项目地址maimaidx'])
-async def dx_github(bot: NoneBot, ev: CQEvent):
-    await bot.send(ev, f'项目地址：https://github.com/Yuri-YuzuChaN/maimaiDX\n求star，求宣传~', at_sender=True)
-
 @sv.on_prefix(['定数查歌', 'search base'])
 async def search_dx_song_level(bot: NoneBot, ev: CQEvent):
     args = ev.message.extract_plain_text().strip().split()
@@ -169,7 +165,7 @@ async def search_dx_song_charter(bot: NoneBot, ev: CQEvent):
     msg += f'第{page}页，共{len(music_data) // SONGS_PER_PAGE + 1}页'
     await bot.send(ev, MessageSegment.image(image_to_base64(text_to_image(msg.strip()))), at_sender=True)
 
-@sv.on_rex(r'^[随来给]个((?:dx|sd|标准))?([绿黄红紫白]?)([0-9]+\+?)$')
+@sv.on_rex(r'^[来随给]个((?:dx|sd|标准))?([绿黄红紫白]?)([0-9]+\+?)$')
 async def random_song(bot: NoneBot, ev: CQEvent):
     try:
         match: Match[str] = ev['match']
@@ -298,11 +294,11 @@ async def apply_alias(bot: NoneBot, ev: CQEvent):
     id, alias_name = args
     if not mai.total_list.by_id(id):
         await bot.finish(ev, f'未找到ID为 [{id}] 的曲目')
-    isexist = await get_alias('alias', {'id': id})
-    if alias_name in isexist[0]['Alias']:
+    isexist = await get_music_alias('alias', {'id': id})
+    if alias_name in isexist[int(id)]:
         await bot.finish(ev, f'该曲目的别名 <{alias_name}> 已存在，不能重复添加别名')
     tag = ''.join(sample(ascii_uppercase + digits, 5))
-    status = await post_alias('apply', {'id': id, 'alias_name': alias_name, 'tag': tag, 'uid': ev.user_id})
+    status = await post_music_alias('apply', {'id': id, 'alias_name': alias_name, 'tag': tag, 'uid': ev.user_id})
     if 'error' in status:
         await bot.finish(ev, status['error'])
     await bot.send(ev, f'''您已提交以下别名申请
@@ -315,23 +311,25 @@ ID：{id}
 @sv.on_prefix(['同意别名', '同意别称'])
 async def agree_alias(bot: NoneBot, ev: CQEvent):
     tag: str = ev.message.extract_plain_text().strip().upper()
-    status = await post_alias('agree', {'tag': tag, 'uid': ev.user_id})
-    if isinstance(status, dict):
+    status = await post_music_alias('agree', {'tag': tag, 'uid': ev.user_id})
+    if 'content' in status:
         await bot.send(ev, status['content'], at_sender=True)
+    elif 'error' in status:
+        await bot.send(ev, status['error'], at_sender=True)
     else:
         await bot.send(ev, status, at_sender=True)
 
 @sv.on_prefix(['当前投票', '当前别名投票', '当前别称投票'])
 async def alias_status(bot: NoneBot, ev: CQEvent):
-    status = await get_alias('status')
+    status = await get_music_alias('status')
     if not status:
         await bot.finish(ev, '未查询到正在进行的别名投票', at_sender=True)
     msg = []
     for tag in status:
         id = str(status[tag]['ID'])
         alias_name = status[tag]['ApplyAlias']
-        usernum = len(status[tag]['User'])
-        votes = status[tag]['votes']
+        usernum = status[tag]['Users']
+        votes = status[tag]['Votes']
         msg.append(f'{tag}：\n{await draw_music_info(mai.total_list.by_id(id))}\n别名：{alias_name}\n票数：{usernum}/{votes}')
     await bot.send(ev, f'浏览{public_addr}查看详情或查看以下合并消息')
     await bot.send_group_forward_msg(group_id=ev.group_id, messages=render_forward_msg(msg, ev.self_id, BOTNAME))
@@ -374,11 +372,14 @@ async def _(session: CommandSession):
 @sv.scheduled_job('interval', minutes=5)
 async def alias_apply_status():
     group = await sv.get_enable_groups()
-    if status := await get_alias('status'):
+    if status := await get_music_alias('status'):
+        if 'error' in status:
+            log.error(f'发生错误：{status["error"]}')
+            raise ValueError
         if alias.config['global']:
             msg = ['检测到新的别名申请']
             for tag in status:
-                if status[tag]['isNew'] and (usernum := len(status[tag]['User'])) < (votes := status[tag]['votes']):
+                if status[tag]['IsNew'] and (usernum := status[tag]['Users']) < (votes := status[tag]['Votes']):
                     id = str(status[tag]['ID'])
                     alias_name = status[tag]['ApplyAlias']
                     music = mai.total_list.by_id(id)
@@ -393,7 +394,10 @@ async def alias_apply_status():
                     except: 
                         continue
     await asyncio.sleep(5)
-    if end := await get_alias('end'):
+    if end := await get_music_alias('end'):
+        if 'error' in status:
+            log.error(f'发生错误：{status["error"]}')
+            raise ValueError
         if alias.config['global']:
             msg2 = ['以下是已成功添加别名的曲目']
             for ta in end:
@@ -439,11 +443,11 @@ BREAK\t5/12.5/25(外加200落)'''
             line = float(pro[-1])
             music = mai.total_list.by_id(chart_id)
             chart = music.charts[level_index]
-            tap = int(chart.tap)
-            slide = int(chart.slide)
-            hold = int(chart.hold)
-            touch = int(chart.touch) if len(chart['notes']) == 5 else 0
-            brk = int(chart.brk)
+            tap = int(chart.notes.tap)
+            slide = int(chart.notes.slide)
+            hold = int(chart.notes.hold)
+            touch = int(chart.notes.touch) if len(chart.notes) == 5 else 0
+            brk = int(chart.notes.brk)
             total_score = tap * 500 + slide * 1500 + hold * 1000 + touch * 500 + brk * 2500
             break_bonus = 0.01 / brk
             break_50_reduce = total_score * break_bonus / 4
@@ -457,19 +461,19 @@ BREAK 50落(一共{brk}个)等价于 {(break_50_reduce / 100):.3f} 个 TAP GREAT
         except:
             await bot.send(ev, '格式错误，输入“分数线 帮助”以查看帮助信息', at_sender=True)
 
-@sv.on_prefix(['b40', 'b50', 'B40', 'B50'])
-async def best_40(bot: NoneBot, ev: CQEvent):
+@sv.on_prefix(['b50', 'B50'])
+async def best_50(bot: NoneBot, ev: CQEvent):
     qqid = ev.user_id
     args: str = ev.message.extract_plain_text().strip()
     for i in ev.message:
         if i.type == 'at' and i.data['qq'] != 'all':
             qqid = int(i.data['qq'])
+
     if args:
         payload = {'username': args}
     else:
         payload = {'qq': qqid}
-    if ev.prefix.lower() == 'b50':
-        payload['b50'] = True
+    payload['b50'] = True
     await bot.send(ev, await generate(payload), at_sender=True)
 
 @sv.on_prefix(['minfo', 'Minfo', 'MINFO'])
@@ -481,10 +485,7 @@ async def maiinfo(bot: NoneBot, ev: CQEvent):
             qqid = int(i.data['qq'])
     if not args:
         await bot.finish(ev, '请输入曲目id或曲名', at_sender=True)
-    payload = {
-        'qq': qqid,
-        'version': list(set(version for version in plate_to_version.values()))
-    }
+    payload = {'qq': qqid}
     if mai.total_list.by_id(args):
         id = args
     elif by_t := mai.total_list.by_title(args):
@@ -500,7 +501,12 @@ async def maiinfo(bot: NoneBot, ev: CQEvent):
             await bot.finish(ev, msg.strip(), at_sender=True)
         else:
             id = str(alias[0].ID)
-    await bot.send(ev, await music_play_data(payload, id), at_sender=True)
+    if token:
+        pic = await music_play_data_dev(payload, id)
+    else:
+        pic = await music_play_data(payload, id)
+
+    await bot.send(ev, pic, at_sender=True)
 
 @sv.on_prefix(['ginfo', 'Ginfo', 'GINFO'])
 async def globinfo(bot: NoneBot, ev: CQEvent):
@@ -536,12 +542,11 @@ async def globinfo(bot: NoneBot, ev: CQEvent):
         await bot.finish(ev, '该乐曲没有这个等级', at_sender=True)
     stats = music.stats[level_index]
     await bot.send(ev, await music_global_data(music, level_index) + f'''
-游玩次数：{round(stats.count)}
-拟合难度：{stats.fit_difficulty:.2f}
+游玩次数：{round(stats.cnt)}
+拟合难度：{stats.fit_diff:.2f}
 平均达成率：{stats.avg:.2f}%
 平均 DX 分数：{stats.avg_dx:.1f}
-谱面成绩标准差：{stats.std_dev:.2f}
-''', at_sender=True)
+谱面成绩标准差：{stats.std_dev:.2f}''', at_sender=True)
 
 @sv.on_rex(r'^我要在?([0-9]+\+?)?上([0-9]+)分\s?(.+)?')  # 慎用，垃圾代码非常吃机器性能
 async def rise_score(bot: NoneBot, ev: CQEvent):
