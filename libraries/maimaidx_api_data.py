@@ -16,7 +16,9 @@ ALIAS = {
     'status': 'GetAliasStatus',
     'apply': 'ApplyAlias',
     'agree': 'AgreeUser',
-    'end': 'GetAliasEnd'
+    'end': 'GetAliasEnd',
+    'music': 'GetMaimaiDXMusic',
+    'chart': 'GetMaimaiDXChartStats'
 }
 
 async def get_player_data(project: str, payload: dict) -> Union[dict, str]:
@@ -86,6 +88,8 @@ async def get_music_alias(api: str, params: dict = None) -> Union[List[Dict[str,
     - `alias`: 该曲目的所有别名
     - `status`: 正在进行的别名申请
     - `end`: 已结束的别名申请
+    - `music`: 中转查分器乐曲数据
+    - `chart`: 中专查分器单曲数据
     """
     try:
         async with aiohttp.request('GET', f'https://api.yuzuai.xyz/maimaidx/{ALIAS[api]}', params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
@@ -108,7 +112,7 @@ async def post_music_alias(api: str, params: dict = None) -> Union[List[Dict[str
     try:
         async with aiohttp.request('POST', f'https://api.yuzuai.xyz/maimaidx/{ALIAS[api]}', params=params, timeout=aiohttp.ClientTimeout(total=30)) as resp:
             if resp.status == 400:
-                data = ''
+                data = '参数输入错误'
             elif resp.status == 500:
                 data = '别名服务器错误，请联系插件开发者'
             else:
