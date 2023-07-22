@@ -31,15 +31,14 @@ def text_to_image(text: str) -> Image.Image:
     lines = text.strip().split('\n')
     max_width = 0
     for line in lines:
-        w, _ = font.getsize(line)
-        max_width = max(max_width, w)
-    h = font.getsize(lines[0])[1]  # 将第一行作为文字高度取样行
+        l, t, r, b = font.getbbox(text)
+        max_width = max(max_width, r)
     wa = max_width + padding * 2
-    ha = h * len(lines) + margin * (len(lines) - 1) + padding * 2
+    ha = b * len(lines) + margin * (len(lines) - 1) + padding * 2
     im = Image.new('RGB', (wa, ha), color=(255, 255, 255))
     draw = ImageDraw.Draw(im)
     for index, line in enumerate(lines):
-        draw.text((padding, padding + index * (margin + h)), line, font=font, fill=(0, 0, 0))
+        draw.text((padding, padding + index * (margin + b)), line, font=font, fill=(0, 0, 0))
     return im
 
 
