@@ -16,7 +16,7 @@ from nonebot.params import CommandArg, Endswith, RegexGroup
 from nonebot.permission import SUPERUSER
 
 from . import BOTNAME, log, token
-from .libraries.image import to_bytes_io
+from .libraries.image import to_bytes_io, file_to_base64
 from .libraries.maimai_best_50 import (comboRank, diffs, generate, levelList,
                                        scoreRank, syncRank)
 from .libraries.maimaidx_api_data import get_music_alias, post_music_alias
@@ -119,7 +119,7 @@ async def get_music():
 
 @manual.handle()
 async def _():
-    await manual.finish(MessageSegment.image(Path(__file__).parent / 'static' / 'maimaidxhelp.png'), reply_message=True)
+    await manual.finish(MessageSegment.image(file_to_base64(Path(__file__).parent / 'static' / 'maimaidxhelp.png')), reply_message=True)
 
 
 @repo.handle()

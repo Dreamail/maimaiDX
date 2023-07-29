@@ -382,7 +382,7 @@ async def query_chart_data(match: Tuple) -> str:
             if music.stats and music.stats[level_index]:
                 result += f'\n拟合难度: {music.stats[level_index].fit_diff:.2f}'
 
-            msg = f'{music.id}. {music.title}' + '\n' + MessageSegment.image(f'file:///{await download_music_pictrue(music.id)}') + '\n' + result
+            msg = f'{music.id}. {music.title}' + '\n' + MessageSegment.image(file_to_base64(f'file:///{await download_music_pictrue(music.id)}')) + '\n' + result
         except:
             msg = '未找到该谱面'
     else:

@@ -57,6 +57,10 @@ def image_to_base64(img: Image.Image, format='PNG') -> str:
     base64_str = base64.b64encode(byte_data).decode()
     return 'base64://' + base64_str
 
+def file_to_base64(path: str) -> str:
+    with open(path, 'rb') as file:
+        base64_str = base64.b64encode(file.read()).decode()
+    return 'base64://' + base64_str
 
 def image_to_bytesio(img: Image.Image, format_='PNG') -> BytesIO:
     bio = BytesIO()
