@@ -3,7 +3,7 @@ import os
 
 from loguru import logger as log
 
-BOTNAME = 'mokabot'
+BOTNAME = '卜卜卜Bot'
 
 static = os.path.join(os.path.dirname(__file__), 'static')
 token = json.load(open(os.path.join(static, 'config.json'), 'r', encoding='utf8'))['token']
