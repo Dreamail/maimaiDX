@@ -11,14 +11,18 @@ import aiofiles
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from .. import static
-from .image import image_to_base64, image_to_bytesio
+from .. import (
+    alias_file,
+    chart_file,
+    coverdir,
+    group_alias_file,
+    guess_file,
+    levelList,
+    music_file,
+)
+from .image import image_to_bytesio
 from .maimaidx_api_data import *
 
-cover_dir = os.path.join(static, 'mai', 'cover')
-alias_file = os.path.join(static, 'all_alias.json')
-music_file = os.path.join(static, 'music_data.json')
-chart_file = os.path.join(static, 'chart_stats.json')
 
 class Stats(BaseModel):
 
@@ -110,6 +114,14 @@ class Music(BaseModel):
     diff: Optional[List[int]] = []
 
 
+class RaMusic(BaseModel):
+    
+    id: str
+    ds: float
+    lv: str
+    type: str
+
+
 class MusicList(List[Music]):
     
     def by_id(self, music_id: str) -> Optional[Music]:
@@ -123,6 +135,38 @@ class MusicList(List[Music]):
             if music.title == music_title:
                 return music
         return None
+    
+    def by_level(self, level: Union[str, List[str]], byid: bool = False) -> Optional[Union[List[Music], List[str]]]:
+        levelList = []             
+        if isinstance(level, str):
+            levelList = [music.id if byid else music for music in self if level in music.level]
+        else:
+            levelList = [music.id if byid else music for music in self for lv in level if lv in music.level]
+        return levelList
+
+    def lvList(self, rating: bool = False) -> Dict[str, Dict[str, Union[List[Music], List[RaMusic]]]]:
+        level = {}
+        for lv in levelList:
+            if lv == '15':
+                r = range(1)
+            elif lv in levelList[:6]:
+                r = range(9, -1, -1)
+            elif '+' in lv:
+                r = range(9, 6, -1)
+            else:
+                r = range(6, -1, -1)
+            levellist = { f'{lv if "+" not in lv else lv[:-1]}.{_}': [] for _ in r }
+            musiclist = self.by_level(lv)
+            for music in musiclist:
+                for diff, ds in enumerate(music.ds):
+                    if str(ds) in levellist:
+                        if rating:
+                            levellist[str(ds)].append(RaMusic(id=music.id, ds=ds, lv=str(diff), type=music.type))
+                        else:
+                            levellist[str(ds)].append(music)
+            level[lv] = levellist
+        
+        return level
 
     def random(self):
         return random.choice(self)
@@ -191,7 +235,7 @@ class AliasList(List[Alias]):
     def by_id(self, music_id: int) -> Optional[List[Alias]]:
         alias_music = []
         for music in self:
-            if music.ID == int(music_id):
+            if music.ID == music_id:
                 alias_music.append(music)
         return alias_music
     
@@ -205,16 +249,19 @@ class AliasList(List[Alias]):
 
 async def download_music_pictrue(id: Union[int, str]) -> Union[str, BytesIO]:
     try:
-        if os.path.exists(file := os.path.join(static, 'mai', 'cover', f'{id}.png')):
+        if os.path.exists(file := os.path.join(coverdir, f'{id}.png')):
             return file
+        id = int(id)
+        if id > 10000 and id <= 11000:
+            id -= 10000
         async with httpx.AsyncClient(timeout=60) as client:
-            req = await client.get(f'https://www.diving-fish.com/covers/{id}.png')
+            req = await client.get(f'https://www.diving-fish.com/covers/{id:05d}.png')
             if req.status_code == 200:
                 return BytesIO(await req.read())
             else:
-                return os.path.join(static, 'mai', 'cover', '11000.png')
+                return os.path.join(coverdir, '11000.png')
     except:
-        return os.path.join(static, 'mai', 'cover', '11000.png')
+        return os.path.join(coverdir, '11000.png')
 
 
 async def openfile(file: str) -> Union[dict, list]:
@@ -418,26 +465,24 @@ mai = MaiMusic()
 
 class Guess:
 
-    Group: Dict[int, Dict[str, Union[MaiMusic, int]]] = {}
+    Group: Dict[str, Dict[str, Union[MaiMusic, int]]] = {}
 
     def __init__(self) -> None:
         """
         猜歌类
         """
-        
-        self.config_json = os.path.join(static, 'guess_config.json')
-        if not os.path.exists(self.config_json):
-            with open(self.config_json, 'w', encoding='utf-8') as f:
+        if not os.path.exists(guess_file):
+            with open(guess_file, 'w', encoding='utf-8') as f:
                 json.dump({'enable': [], 'disable': []}, f)
-        self.config: Dict[str, List[int]] = json.load(open(self.config_json, 'r', encoding='utf-8'))
+        self.config: Dict[str, List[int]] = json.load(open(guess_file, 'r', encoding='utf-8'))
     
-    def add(self, gid: int):
+    def add(self, gid: str):
         """
         新增猜歌群，防止重复指令
         """
         self.Group[gid] = {}
-
-    def start(self, gid: int, music: MaiMusic, cycle: int = 0):
+    
+    def start(self, gid: str, music: MaiMusic, cycle: int = 0):
         """
         正式开始猜歌
         """
@@ -446,7 +491,7 @@ class Guess:
             'cycle': cycle
         }
 
-    def end(self, gid: int):
+    def end(self, gid: str):
         """
         结束猜歌
         """
@@ -467,7 +512,7 @@ class Guess:
             if gid in self.config['enable']:
                 self.config['enable'].remove(gid)
         try:
-            with open(self.config_json, 'w', encoding='utf-8') as f:
+            with open(guess_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=True, indent=4)
         except:
             log.error(traceback.format_exc())
@@ -477,11 +522,10 @@ guess = Guess()
 class GroupAlias:
 
     def __init__(self) -> None:
-        self.group_alias = os.path.join(static, 'group_alias.json')
-        if not os.path.exists(self.group_alias):
-            with open(self.group_alias, 'w', encoding='utf-8') as f:
+        if not os.path.exists(group_alias_file):
+            with open(group_alias_file, 'w', encoding='utf-8') as f:
                 json.dump({'enable': [], 'disable': [], 'global': True}, f)
-        self.config: Dict[str, List[int]] = json.load(open(self.group_alias, 'r', encoding='utf-8'))
+        self.config: Dict[str, List[int]] = json.load(open(group_alias_file, 'r', encoding='utf-8'))
         if 'global' not in self.config:
             self.config['global'] = True
             self.alias_save()
@@ -511,7 +555,7 @@ class GroupAlias:
 
     def alias_save(self):
         try:
-            with open(self.group_alias, 'w', encoding='utf-8') as f:
+            with open(group_alias_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=True, indent=4)
         except:
             log.error(traceback.format_exc())

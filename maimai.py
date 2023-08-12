@@ -1,34 +1,41 @@
 import asyncio
 import re
-from pathlib import Path
 from random import sample
 from string import ascii_uppercase, digits
 from textwrap import dedent
 from typing import Optional, Tuple
 
-from nonebot import (get_bot, get_driver, logger, on_command, on_endswith,
-                     on_message, on_regex, require)
-from nonebot.adapters.onebot.v11 import (GROUP_ADMIN, Bot, GroupMessageEvent,
-                                         Message, MessageEvent, MessageSegment,
-                                         PrivateMessageEvent)
+from nonebot import (
+    get_bot,
+    get_driver,
+    logger,
+    on_command,
+    on_endswith,
+    on_message,
+    on_regex,
+    require,
+)
+from nonebot.adapters.onebot.v11 import (
+    GROUP_ADMIN,
+    Bot,
+    GroupMessageEvent,
+    Message,
+    MessageEvent,
+    MessageSegment,
+    PrivateMessageEvent,
+)
+from nonebot.adapters.onebot.v11.permission import GROUP_ADMIN, GROUP_OWNER
 from nonebot.matcher import Matcher
 from nonebot.params import CommandArg, Endswith, RegexGroup
 from nonebot.permission import SUPERUSER
 
-from . import BOTNAME, log, token
+from . import BOTNAME, Root, log, plate_to_version, token
 from .libraries.image import to_bytes_io
-from .libraries.maimai_best_50 import (comboRank, diffs, generate, levelList,
-                                       scoreRank, syncRank)
+from .libraries.maimai_best_50 import *
 from .libraries.maimaidx_api_data import get_music_alias, post_music_alias
 from .libraries.maimaidx_music import alias, guess, mai, update_local_alias
-from .libraries.maimaidx_project import (SONGS_PER_PAGE,
-                                         draw_music_info_to_message_segment,
-                                         level_achievement_list_data,
-                                         level_process_data, music_global_data,
-                                         music_play_data, music_play_data_dev,
-                                         plate_to_version, player_plate_data,
-                                         query_chart_data, rating_ranking_data,
-                                         rise_score_data)
+from .libraries.maimaidx_music_info import *
+from .libraries.maimaidx_player_score import *
 from .libraries.tool import hash, render_forward_msg
 
 driver = get_driver()
@@ -39,10 +46,7 @@ def is_now_playing_guess_music(event: GroupMessageEvent) -> bool:
     return event.group_id in guess.Group
 
 
-def is_group_admin(event: GroupMessageEvent) -> bool:
-    return event.sender.role in ('owner', 'admin')
-
-
+data_update = on_command('更新maimai数据', priority=5, permission=SUPERUSER)
 manual = on_command('帮助maimaiDX', aliases={'帮助maimaidx'}, priority=5)
 repo = on_command('项目地址maimaiDX', aliases={'项目地址maimaidx'}, priority=5)
 search_base = on_command('定数查歌', aliases={'search base'}, priority=5)
@@ -52,22 +56,25 @@ search_charter = on_command('谱师查歌', aliases={'search charter'}, priority
 random_song = on_regex(r'^[随来给]个((?:dx|sd|标准))?([绿黄红紫白]?)([0-9]+\+?)$', priority=5)
 mai_what = on_regex(r'.*mai.*什么', priority=5)
 search = on_command('查歌', aliases={'search'}, priority=5)  # 注意 on 响应器的注册顺序，search 应当优先于 search_* 之前注册
-query_chart = on_regex(r'^([绿黄红紫白]?)\s?id\s?([0-9]+)$', priority=5)
+query_chart = on_command('id', aliases={'Id', 'ID'}, priority=5)
 mai_today = on_command('今日mai', aliases={'今日舞萌', '今日运势'}, priority=5)
 what_song = on_endswith(('是什么歌', '是啥歌'), priority=5)
 alias_song = on_endswith(('有什么别称', '有什么别名'), priority=5)
 alias_local_apply = on_command('添加本地别名', aliases={'添加本地别称'}, priority=5)
-alias_apply = on_command('添加别名', aliases={'增加别名', '增添别名', '添加别称'}, priority=5, permission=GROUP_ADMIN)
+alias_apply = on_command('添加别名', aliases={'增加别名', '增添别名', '添加别称'}, priority=5, permission=GROUP_ADMIN | GROUP_OWNER)
 alias_agree = on_command('同意别名', aliases={'同意别称'}, priority=5)
 alias_status = on_command('当前投票', aliases={'当前别名投票', '当前别称投票'}, priority=5)
-alias_on = on_command('开启别名推送', aliases={'开启别称推送'}, priority=5, permission=GROUP_ADMIN)
-alias_off = on_command('关闭别名推送', aliases={'关闭别称推送'}, priority=5, permission=GROUP_ADMIN)
+alias_on = on_command('开启别名推送', aliases={'开启别称推送'}, priority=5, permission=GROUP_ADMIN | GROUP_OWNER)
+alias_off = on_command('关闭别名推送', aliases={'关闭别称推送'}, priority=5, permission=GROUP_ADMIN | GROUP_OWNER)
 alias_global_switch = on_command('aliasswitch', aliases={'全局关闭别称推送', '全局开启别称推送'}, priority=5, permission=SUPERUSER)
 alias_update = on_command('aliasupdate', aliases={'更新别名库'}, priority=5, permission=SUPERUSER)
 score = on_command('分数线', priority=5)
 best50 = on_command('b50', aliases={'B50'}, priority=5)
 minfo = on_command('minfo', aliases={'minfo', 'Minfo', 'MINFO'}, priority=5)
 ginfo = on_command('ginfo', aliases={'ginfo', 'Ginfo', 'GINFO'}, priority=5)
+table_update = on_command('更新定数表', priority=5, permission=SUPERUSER)
+rating_table = on_endswith('定数表', priority=5)
+rating_table_pf = on_endswith('完成表', priority=5)
 rise_score = on_regex(r'^我要在?([0-9]+\+?)?上([0-9]+)分\s?(.+)?', priority=5)
 plate_process = on_regex(r'^([真超檄橙暁晓桃櫻樱紫菫堇白雪輝辉熊華华爽舞霸星宙])([極极将舞神者]舞?)进度\s?(.+)?', priority=5)
 level_process = on_regex(r'^([0-9]+\+?)\s?(.+)进度\s?(.+)?', priority=5)
@@ -75,8 +82,8 @@ level_achievement_list = on_regex(r'^([0-9]+\+?)分数列表\s?([0-9]+)?\s?(.+)?
 rating_ranking = on_command('查看排名', aliases={'查看排行'}, priority=5)
 guess_music_start = on_command('猜歌', priority=5)
 guess_music_solve = on_message(rule=is_now_playing_guess_music, priority=5)
-guess_music_enable = on_command('开启猜歌', aliases={'开启mai猜歌'}, priority=5, permission=GROUP_ADMIN | is_group_admin)
-guess_music_disable = on_command('关闭猜歌', aliases={'关闭mai猜歌'}, priority=5, permission=GROUP_ADMIN | is_group_admin)
+guess_music_enable = on_command('开启猜歌', aliases={'开启mai猜歌'}, priority=5, permission=GROUP_ADMIN | GROUP_OWNER)
+guess_music_disable = on_command('关闭猜歌', aliases={'关闭mai猜歌'}, priority=5, permission=GROUP_ADMIN | GROUP_OWNER)
 
 public_addr = 'https://vote.yuzuai.xyz/'
 
@@ -113,13 +120,20 @@ async def get_music():
     await mai.get_music()
     log.info('正在获取maimai所有曲目别名信息')
     await mai.get_music_alias()
-    log.info('获取完成')
+    log.info('maimai数据获取完成')
     mai.guess()
+
+
+@data_update.handle()
+async def _(event: PrivateMessageEvent):
+    await mai.get_music()
+    await mai.get_music_alias()
+    await data_update.send('maimai数据更新完成')
 
 
 @manual.handle()
 async def _():
-    await manual.finish(MessageSegment.image(Path(__file__).parent / 'static' / 'maimaidxhelp.png'), reply_message=True)
+    await manual.finish(MessageSegment.image(f'file:///{os.path.join(Root, "maimaidxhelp.png")}'), reply_message=True)
 
 
 @repo.handle()
@@ -264,7 +278,7 @@ async def _(match: Tuple = RegexGroup()):
         if len(music_data) == 0:
             msg = '没有这样的乐曲哦。'
         else:
-            msg = await draw_music_info_to_message_segment(music_data.random())
+            msg = await new_draw_music_info(music_data.random())
     except:
         msg = '随机命令错误，请检查语法'
     await random_song.finish(msg, reply_message=True)
@@ -272,7 +286,7 @@ async def _(match: Tuple = RegexGroup()):
 
 @mai_what.handle()
 async def _():
-    await mai_what.finish(await draw_music_info_to_message_segment(mai.total_list.random()), reply_message=True)
+    await mai_what.finish(await new_draw_music_info(mai.total_list.random()), reply_message=True)
 
 
 @search.handle()
@@ -284,7 +298,7 @@ async def _(args: Message = CommandArg()):
     if len(result) == 0:
         await search.finish('没有找到这样的乐曲。', reply_message=True)
     elif len(result) == 1:
-        msg = await draw_music_info_to_message_segment(result.random())
+        msg = await new_draw_music_info(result.random())
         await search.finish(msg, reply_message=True)
     elif len(result) < 50:
         search_result = ''
@@ -296,9 +310,19 @@ async def _(args: Message = CommandArg()):
 
 
 @query_chart.handle()
-async def _(match: Tuple = RegexGroup()):
-    msg = await query_chart_data(match)
-    await query_chart.finish(msg, reply_message=True)
+async def _(args: Message = CommandArg()):
+    id = args.extract_plain_text().strip()
+    if not id:
+        return
+    if id.isdigit():
+        music = mai.total_list.by_id(id)
+        if not music:
+            msg = f'未找到ID为[{id}]的乐曲'
+        else:
+            msg = await new_draw_music_info(music)
+        await query_chart.send(msg)
+    else:
+        await query_chart.send('仅允许使用id查询', reply_message=True)
 
 
 @mai_today.handle()
@@ -337,7 +361,7 @@ async def _(event: MessageEvent, end: str = Endswith()):
         await what_song.finish(msg.strip(), reply_message=True)
 
     music = mai.total_list.by_id(str(data[0].ID))
-    await what_song.finish('您要找的是不是：' + await draw_music_info_to_message_segment(music), reply_message=True)
+    await what_song.finish('您要找的是不是：' + await new_draw_music_info(music), reply_message=True)
 
 
 @alias_song.handle()
@@ -686,6 +710,39 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
         '''), reply_message=True)
 
 
+@table_update.handle()
+async def _(event: PrivateMessageEvent):
+    await table_update.send(update_rating_table())
+
+
+@rating_table.handle()
+async def _(args: Message = CommandArg()):
+    args = args.extract_plain_text().strip()
+    if args in levelList[:5]:
+        await rating_table.send('只支持查询lv6-15的定数表', reply_message=True)
+    elif args in levelList[5:]:
+        if args in levelList[-3:]:
+            img = os.path.join(ratingdir, '14.png')
+        else:
+            img = os.path.join(ratingdir, f'{args}.png')
+        await rating_table.send(MessageSegment.image(f'''file:///{img}'''))
+    else:
+        await rating_table.send('无法识别的定数', reply_message=True)
+
+
+@rating_table_pf.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    qqid = event.user_id
+    args: str = args.extract_plain_text().strip()
+    if args in levelList[:5]:
+        await rating_table_pf.send('只支持查询lv6-15的完成表', reply_message=True)
+    elif args in levelList[5:]:
+        img = await rating_table_draw({'qq': qqid}, args)
+        await rating_table_pf.send(img, reply_message=True)
+    # else:
+    #     await rating_table_pf.send('无法识别的定数', reply_message=True)
+
+
 @rise_score.handle()  # 慎用，垃圾代码非常吃机器性能
 async def _(bot: Bot, event: MessageEvent, match: Tuple = RegexGroup()):
     qqid = get_at_qq(event.get_message()) or event.user_id
@@ -826,22 +883,25 @@ async def guess_music_loop(event: GroupMessageEvent):
         return
     if cycle < 6:
         await guess_music_start.send(f'{cycle + 1}/7 这首歌{_guess.guess_options[cycle]}')
+        guess.Group[gid]['cycle'] += 1
+        await guess_music_loop(event)
     else:
         await guess_music_start.send('7/7 这首歌封面的一部分是：\n' + MessageSegment.image(_guess.image) + '\n答案将在30秒后揭晓')
         await give_answer(event)
-    guess.Group[gid]['cycle'] += 1
-    await guess_music_loop(event)
 
 
 async def give_answer(event: GroupMessageEvent):
-    gid = event.group_id
-    await asyncio.sleep(30)
-    _guess = guess.Group[gid]['object']
-    if gid not in guess.config['enable'] or _guess.is_end:
-        return
-    _guess.is_end = True
+    gid = str(event.group_id)
+    for _ in range(30):
+        await asyncio.sleep(1)
+        if gid in guess.Group:
+            if event.group_id not in guess.config['enable'] or guess.Group[gid]['object'].is_end:
+                return
+        else:
+            return
+    guess.Group[gid]['object'].is_end = True
     guess.end(gid)
-    await guess_music_solve.finish('答案是：' + await draw_music_info_to_message_segment(_guess.music), reply_message=True)
+    await guess_music_solve.finish('答案是：' + await new_draw_music_info(guess.Group[gid]['object'].music), reply_message=True)
 
 
 @guess_music_solve.handle()
@@ -876,7 +936,7 @@ async def _(matcher: Matcher, event: GroupMessageEvent):
 async def Data_Update():
     await mai.get_music()
     mai.guess()
-    logger.info('数据更新完毕')
+    logger.info('maimaiDX数据更新完毕')
 
 
 scheduler.add_job(alias_apply_status, 'interval', minutes=5)
