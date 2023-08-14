@@ -854,65 +854,50 @@ async def _(arg: Message = CommandArg()):
 
 @guess_music_start.handle()
 async def _(event: GroupMessageEvent):
-    gid = event.group_id
+    gid = str(event.group_id)
     if gid not in guess.config['enable']:
         await guess_music_start.finish('该群已关闭猜歌功能，开启请输入 开启mai猜歌', reply_message=True)
     if gid in guess.Group:
         await guess_music_start.finish('该群已有正在进行的猜歌', reply_message=True)
-    guess.add(gid)
-    await mai.start()
-    guess.start(gid, mai, 0)
+    await guess.start(gid)
     await guess_music_start.send(
         '我将从热门乐曲中选择一首歌，每隔8秒描述它的特征，'
         '请输入歌曲的 id 标题 或 别名（需bot支持，无需大小写） 进行猜歌（DX乐谱和标准乐谱视为两首歌）。'
         '猜歌时查歌等其他命令依然可用。'
     )
-    await guess_music_loop(event)
-    await guess_music_start.finish()
-
-
-async def guess_music_loop(event: GroupMessageEvent):
-    gid = event.group_id
-    cycle = guess.Group[gid]['cycle']
-    if cycle != 0:
-        await asyncio.sleep(8)
-    else:
-        await asyncio.sleep(4)
-    _guess = guess.Group[gid]['object']
-    if gid not in guess.config['enable'] or _guess.is_end:
-        return
-    if cycle < 6:
-        await guess_music_start.send(f'{cycle + 1}/7 这首歌{_guess.guess_options[cycle]}')
-        guess.Group[gid]['cycle'] += 1
-        await guess_music_loop(event)
-    else:
-        await guess_music_start.send('7/7 这首歌封面的一部分是：\n' + MessageSegment.image(_guess.image) + '\n答案将在30秒后揭晓')
-        await give_answer(event)
-
-
-async def give_answer(event: GroupMessageEvent):
-    gid = str(event.group_id)
-    for _ in range(30):
-        await asyncio.sleep(1)
-        if gid in guess.Group:
-            if event.group_id not in guess.config['enable'] or guess.Group[gid]['object'].is_end:
-                return
+    await asyncio.sleep(4)
+    for cycle in range(7):
+        if event.group_id not in guess.config['enable'] or gid not in guess.Group or guess.Group[gid].end:
+            break
+        if cycle < 6:
+            await guess_music_start.send(f'{cycle + 1}/7 这首歌{guess.Group[gid].options[cycle]}')
+            await asyncio.sleep(8)
         else:
-            return
-    guess.Group[gid]['object'].is_end = True
-    guess.end(gid)
-    await guess_music_solve.finish('答案是：' + await new_draw_music_info(guess.Group[gid]['object'].music), reply_message=True)
+            await guess_music_start.send(f'''7/7 这首歌封面的一部分是：\n{MessageSegment.image(guess.Group[gid].img)}答案将在30秒后揭晓''')
+            for _ in range(30):
+                await asyncio.sleep(1)
+                if gid in guess.Group:
+                    if event.group_id not in guess.config['enable'] or guess.Group[gid].end:
+                        return
+                else:
+                    return
+            guess.Group[gid].end = True
+            answer = f'''答案是：\n{await new_draw_music_info(guess.Group[gid].music)}'''
+            guess.end(gid)
+            await guess_music_start.finish(answer)
 
 
 @guess_music_solve.handle()
 async def _(event: GroupMessageEvent):
-    gid = event.group_id
+    gid = str(event.group_id)
+    if gid not in guess.Group:
+        return
     ans = event.get_plaintext().strip()
-    guess_ = guess.Group[gid]['object']
-    if ans.lower() in guess_.answer:
-        guess_.is_end = True
+    if ans.lower() in guess.Group[gid].answer:
+        guess.Group[gid].end = True
+        answer = '猜对了，答案是：' + await draw_music_info_to_message_segment(guess.Group[gid].music)
         guess.end(gid)
-        await guess_music_solve.finish('猜对了，答案是：' + await draw_music_info_to_message_segment(guess_.music), reply_message=True)
+        await guess_music_solve.finish(answer, reply_message=True)
 
 
 @guess_music_enable.handle()
